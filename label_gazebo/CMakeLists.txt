@@ -40,3 +40,22 @@ catkin_install_python(PROGRAMS
   scripts/geopy.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+## Mark other directories for installation:
+install(
+    DIRECTORY
+        launch/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+    FILES_MATCHING PATTERN "*.launch"
+)
+install(
+    DIRECTORY
+        config/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
+    FILES_MATCHING PATTERN "*.yaml"
+)
+install(
+    DIRECTORY
+        rviz/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/rviz
+    FILES_MATCHING PATTERN "*.rviz"
+)
