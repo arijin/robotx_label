@@ -1,8 +1,8 @@
 <launch>
 
   <!-- Acoustic pinger position(s) -->
-  <!-- <arg name="objects_infos" default="$(find label_gazebo)/config/objects_param.yaml"/>
-  <rosparam command="load" file="$(arg objects_infos)" /> -->
+  <arg name="objects_infos" default="$(find label_gazebo)/config/objects_param.yaml"/>
+  <rosparam command="load" file="$(arg objects_infos)" />
 
   <!-- Set the pinger location -->
   <node name="label_in_simulaiton" pkg="label_gazebo" type="label.py" output="screen">

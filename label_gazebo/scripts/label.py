@@ -46,6 +46,8 @@ def label():
     ships_type = rospy.get_param(f"ships/total_ships_type")
     # first get all model states
     my_ship_state = get_model_state("wamv")
+    my_x = my_ship_state.modelstate.pose.position.x
+    my_y = my_ship_state.modelstate.pose.position.y
     for ship_type in ships_type:
         total_ships_name = rospy.get_param(
             f"ships/{ship_type}/ships_name")
@@ -53,13 +55,14 @@ def label():
             ships_state[ship_name] = get_model_state(ship_name)
     # remove far models
     for obj_ship_name, obj_ship_state in list(ships_state.items()):
-        my_x = my_ship_state.modelstate.pose.position.x
-        my_y = my_ship_state.modelstate.pose.position.y
         obj_x = obj_ship_state.modelstate.pose.position.x
         obj_y = obj_ship_state.modelstate.pose.position.y
         if euclid_distance(my_x, my_y, obj_x, obj_y) > 100:
             del ships_state[obj_ship_name]
             continue
+    print(f"my state: ({my_x},{my_y})")
+    print(f"left number: {len(ships_state)}")
+    print(ships_state)
     # second get all model states and collect sensor data
 
 
@@ -81,18 +84,19 @@ def collect():
 
 def callback(rgb_msg, camera_info):
     rospy.loginfo("camera collecting time: %s", rgb_msg.header.stamp.to_sec())
-    rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg)
+    rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
     camera_info_K = np.array(camera_info.K).reshape([3, 3])
     camera_info_D = np.array(camera_info.D)
     rgb_undist = cv2.undistort(rgb_image, camera_info_K, camera_info_D)
 
     # # info show
     # print("camera params:")
-    print(camera_info_K)
-    print(camera_info_D)
+    # print(camera_info_K)
+    # print(camera_info_D)
     cv2.imshow("image show", rgb_undist)
     cv2.waitKey(1)
 
+    label()
     print("read")
 
 
