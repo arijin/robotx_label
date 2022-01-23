@@ -1,12 +1,7 @@
 ships:
   total_ships_type: ["wamv", "warship_ship20", "warship", "ipacship"]
   wamv:
-    ships_param:
-      kp_linear_velocity_1: 1
-      kp_linear_velocity_2: 1
-      kp_linear_velocity_3: 1
-      kp_angular_velocity_1: 1
-      kp_angular_velocity_2: 1
+    size: [2.53, -2.65, 1.22, -1.22, 1.3]
     ships_name:
       [
         "wamv_1_1",
@@ -36,12 +31,7 @@ ships:
         "wamv_5_5",
       ]
   warship_ship20:
-    ships_param:
-      kp_linear_velocity_1: 10
-      kp_linear_velocity_2: 5
-      kp_linear_velocity_3: 5
-      kp_angular_velocity_1: 12
-      kp_angular_velocity_2: 5
+    size: [2.93, -1.92, 1.45, -1.45, 1.52]
     ships_name:
       [
         "warship_ship20_1",
@@ -51,12 +41,7 @@ ships:
         "warship_ship20_5",
       ]
   warship:
-    ships_param:
-      kp_linear_velocity_1: 10
-      kp_linear_velocity_2: 5
-      kp_linear_velocity_3: 5
-      kp_angular_velocity_1: 12
-      kp_angular_velocity_2: 5
+    size: [8.1, -6.7, 3.6, -1.4, 4.1]
     ships_name:
       [
         "warship_gray_1",
@@ -77,167 +62,47 @@ ships:
         "warship_blue_4",
       ]
   ipacship:
-    ships_param:
-      kp_linear_velocity_1: 10
-      kp_linear_velocity_2: 5
-      kp_linear_velocity_3: 5
-      kp_angular_velocity_1: 12
-      kp_angular_velocity_2: 5
+    size: [2.80, -1.59, 0.75, -0.75, 1.12]
     ships_name:
       ["ipac_005_1", "ipac_005_2", "ipac_005_3", "ipac_005_4", "ipac_005_5"]
 
-wamv_1_1:
-  x: -1150
-  y: 210
-wamv_1_2:
-  x: -1150
-  y: 205
-wamv_1_3:
-  x: -1150
-  y: 200
-wamv_1_4:
-  x: -1150
-  y: 195
-wamv_1_5:
-  x: -1150
-  y: 190
-wamv_2_1:
-  x: -1160
-  y: 210
-wamv_2_2:
-  x: -1160
-  y: 205
-wamv_2_3:
-  x: -1160
-  y: 200
-wamv_2_4:
-  x: -1160
-  y: 195
-wamv_2_5:
-  x: -1160
-  y: 190
-wamv_3_1:
-  x: -1170
-  y: 210
-wamv_3_2:
-  x: -1170
-  y: 205
-wamv_3_3:
-  x: -1170
-  y: 200
-wamv_3_4:
-  x: -1170
-  y: 195
-wamv_3_5:
-  x: -1170
-  y: 190
-wamv_4_1:
-  x: -1180
-  y: 210
-wamv_4_2:
-  x: -1180
-  y: 205
-wamv_4_3:
-  x: -1180
-  y: 200
-wamv_4_4:
-  x: -1180
-  y: 195
-wamv_4_5:
-  x: -1180
-  y: 190
-wamv_5_1:
-  x: -1190
-  y: 210
-wamv_5_2:
-  x: -1190
-  y: 205
-wamv_5_3:
-  x: -1190
-  y: 200
-wamv_5_4:
-  x: -1190
-  y: 195
-wamv_5_5:
-  x: -1190
-  y: 190
-
-warship_ship20_1:
-  x: -1200
-  y: 210
-warship_ship20_2:
-  x: -1200
-  y: 205
-warship_ship20_3:
-  x: -1200
-  y: 200
-warship_ship20_4:
-  x: -1200
-  y: 195
-warship_ship20_5:
-  x: -1200
-  y: 190
-warship_gray_1:
-  x: -1155
-  y: 175
-warship_gray_2:
-  x: -1155
-  y: 165
-warship_gray_3:
-  x: -1155
-  y: 155
-warship_gray_4:
-  x: -1155
-  y: 145
-warship_black_1:
-  x: -1176
-  y: 175
-warship_black_2:
-  x: -1176
-  y: 165
-warship_black_3:
-  x: -1176
-  y: 155
-warship_black_4:
-  x: -1176
-  y: 145
-warship_white_1:
-  x: -1176
-  y: 175
-warship_white_2:
-  x: -1176
-  y: 165
-warship_white_3:
-  x: -1176
-  y: 155
-warship_white_4:
-  x: -1176
-  y: 145
-warship_blue_1:
-  x: -1197
-  y: 175
-warship_blue_2:
-  x: -1197
-  y: 165
-warship_blue_3:
-  x: -1197
-  y: 155
-warship_blue_4:
-  x: -1197
-  y: 145
-
-ipac_005_1:
-  x: -1176
-  y: 130
-ipac_005_2:
-  x: -1176
-  y: 122
-ipac_005_3:
-  x: -1176
-  y: 114
-ipac_005_4:
-  x: -1176
-  y: 106
-ipac_005_5:
-  x: -1176
-  y: 98
+objects:
+  total_objects_type: ["sphere_buoy", "cone_buoy", "light_buoy", "docking"]
+  sphere_buoy:
+    global_position: [-420, 295]
+    global_yaw: -2.04
+    size: [0.25, -0.25, 0.25, -0.25, 0.45]
+    relative_position:
+      [
+        [56.84848062, 59.2614612521],
+        [56.9804067204, 8.39663411782],
+        [-39.9569402425, -59.6380114707],
+        [40.5935528521, 0.420855757631],
+        [45.1471787907, -1.58774897319],
+        [37.4966413916, -23.6251778906],
+        [46.2135293014, -5.59469145311],
+        [24.576913737, 30.3481238647],
+        [37.5737439619, -18.8335819857],
+        [-2.49572219989, 13.1619102364],
+        [59.628595207, -32.2043953768],
+        [51.0184408248, -44.8771143523],
+        [-37.1237799886, -55.0780758672],
+        [4.82024240714, 5.70282780335],
+        [-10.7269893388, -31.6245175746],
+      ]
+  cone_buoy:
+    global_position: [-475, 185]
+    global_yaw: -2.14
+    size: [0.2, -0.2, 0.2, -0.2, 0.85]
+    relative_position:
+      [[0, 0], [-20, 0], [-40, 0], [0, -20], [-20, -20], [-40, -20]]
+  light_buoy:
+    global_position: [-511, 218]
+    global_yaw: 0
+    size: [0.45, -0.45, 0.45, -0.45, 1.75]
+    relative_position: [[0, 0]]
+  docking:
+    global_position: [-554, 233]
+    global_yaw: 0
+    size: [7, -1, 19, -1, 0.23]
+    relative_position: [[0, 0]]

@@ -1,8 +1,14 @@
 #!/usr/bin/env python
 
+from sympy import Idx
 import cv2
 import numpy as np
-from geopy import quart_to_rpy, euler_to_quaternion, euclid_distance
+import os
+import _thread
+import math
+import time
+import geopy as gp
+# ros
 import rospy
 import rospkg
 import message_filters
@@ -18,11 +24,81 @@ from sensor_msgs.msg import Image, CameraInfo
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs import point_cloud2
 
-import os
-import _thread
-import math
-import time
+
 basedir = os.path.abspath(os.path.dirname(__file__))
+split = "training"  # or "testing"
+ROOT_DIR = '/home/qiaolei'
+root_dir = os.path.join(ROOT_DIR, 'dataset/inWater/object')
+split_dir = os.path.join(root_dir, split)
+
+
+class raw_object(object):
+    def __init__(self, mystate):
+        self.type = None
+        self.tx = None
+        self.ty = None
+        self.tz = None
+
+        self.pos_sx = None
+        self.neg_sx = None
+        self.pos_sy = None
+        self.neg_sy = None
+        self.h = None
+
+        self.tyaw = None
+
+        self.mx = mystate.modelstate.pose.position.x
+        self.my = mystate.modelstate.pose.position.y
+        self.mz = mystate.modelstate.pose.position.z
+
+        self.mroll = self.get_state_rpy(mystate)[0]
+        self.mpitch = self.get_state_rpy(mystate)[1]
+        self.myaw = self.get_state_rpy(mystate)[2]
+
+    def read_target_from_state(self, type, objectstate):
+        self.type = type
+        self.tx = objectstate.modelstate.pose.position.x
+        self.ty = objectstate.modelstate.pose.position.y
+        self.tz = objectstate.modelstate.pose.position.z
+
+        self.tyaw = self.get_state_rpy(objectstate)[2]
+
+        self.tdis = gp.euclid_distance(self.mx, self.my, self.tx, self.ty)
+
+    def read_target_from_param(self, type, tx, ty, global_yaw):
+        self.type = type
+        self.tx = tx
+        self.ty = ty
+        self.tz = 0
+
+        # unfinished.
+        if type == "cone_buoy" or type == "sphere_buoy":
+            self.tyaw = 0
+        else:
+            self.tyaw = global_yaw
+        self.tdis = gp.euclid_distance(self.mx, self.my, self.tx, self.ty)
+
+    def get_state_rpy(self, state):
+        qx = state.modelstate.pose.orientation.x
+        qy = state.modelstate.pose.orientation.y
+        qz = state.modelstate.pose.orientation.z
+        qw = state.modelstate.pose.orientation.w
+        rpy = gp.quart_to_rpy(qx, qy, qz, qw)
+        return rpy
+
+    def read_basicinfos(self, type, subtype):
+        ship_size = rospy.get_param(f"{type}/{subtype}/size")
+        self.pos_sx = ship_size[0]
+        self.neg_sx = ship_size[1]
+        self.pos_sy = ship_size[2]
+        self.neg_sy = ship_size[3]
+        self.h = ship_size[4]
+
+    def get_labelline(self):
+        line = f"{self.type} {self.tx} {self.ty} {self.tz} {self.pos_sx} {self.neg_sx} {self.pos_sy} " +\
+               f"{self.neg_sy} {self.h} {self.tyaw} {self.mx} {self.my} {self.mz} {self.mroll} {self.mpitch} " +\
+               f"{self.myaw} {self.tdis}\n"
+        return line
 
 
 def get_model_state(name):
@@ -41,63 +117,186 @@ def get_model_state(name):
     return latest_state
 
 
-def label():
-    ships_state = dict()
-    ships_type = rospy.get_param(f"ships/total_ships_type")
-    # first get all model states
+def get_mystate():
     my_ship_state = get_model_state("wamv")
+    return my_ship_state
+
+
+def get_objectstate(my_ship_state):
     my_x = my_ship_state.modelstate.pose.position.x
     my_y = my_ship_state.modelstate.pose.position.y
+    objectsList = list()
+
+    # ships
+    ships_type = rospy.get_param(f"ships/total_ships_type")
+    # get all ship states
     for ship_type in ships_type:
         total_ships_name = rospy.get_param(
             f"ships/{ship_type}/ships_name")
         for ship_name in total_ships_name:
-            ships_state[ship_name] = get_model_state(ship_name)
-    # remove far models
-    for obj_ship_name, obj_ship_state in list(ships_state.items()):
-        obj_x = obj_ship_state.modelstate.pose.position.x
-        obj_y = obj_ship_state.modelstate.pose.position.y
-        if euclid_distance(my_x, my_y, obj_x, obj_y) > 100:
-            del ships_state[obj_ship_name]
-            continue
-    print(f"my state: ({my_x},{my_y})")
-    print(f"left number: {len(ships_state)}")
-    print(ships_state)
-    # second get all model states and collect sensor data
+            obj_ship_state = get_model_state(ship_name)
+            obj_x = obj_ship_state.modelstate.pose.position.x
+            obj_y = obj_ship_state.modelstate.pose.position.y
+            dis = gp.euclid_distance(my_x, my_y, obj_x, obj_y)
+            if dis > 200:
+                continue
+            else:
+                ship_object = raw_object(my_ship_state)
+                ship_object.read_target_from_state('ship', obj_ship_state)
+                ship_object.read_basicinfos('ships', ship_type)
+                objectsList.append(ship_object)
+                # print(f"{ship_type}, ({obj_x}, {obj_y})\n")
+    # objects
+    objects_type = rospy.get_param(f"objects/total_objects_type")
+    # get all object states
+    for object_type in objects_type:
+        global_position = rospy.get_param(
+            f"objects/{object_type}/global_position")
+        global_yaw = rospy.get_param(
+            f"objects/{object_type}/global_yaw")
+        relative_positions = rospy.get_param(
+            f"objects/{object_type}/relative_position")
+        for object_position in relative_positions:
+            obj_x = global_position[0] + object_position[0] * \
+                np.cos(global_yaw) - object_position[1] * np.sin(global_yaw)
+            obj_y = global_position[1] + object_position[0] * \
+                np.sin(global_yaw) + object_position[1] * np.cos(global_yaw)
+            dis = gp.euclid_distance(my_x, my_y, obj_x, obj_y)
+            if dis > 200:
+                continue
+            else:
+                object = raw_object(my_ship_state)
+                object.read_target_from_param(
+                    object_type, obj_x, obj_y, global_yaw)
+                object.read_basicinfos('objects', object_type)
+                objectsList.append(object)
+                # print(f"{object_type}, ({obj_x}, {obj_y})\n")
+    return objectsList
+    # print(f"my state: ({my_x},{my_y})")
+    # print(f"target number: {len(objectsList)}")
 
 
 def collect():
     pass
 
+
+def linestr(key, value):
+    label = f"{key}:"
+    if isinstance(value, int) or isinstance(value, float) or isinstance(value, str):
+        label = f"{label}{value}\n"
+        return label
+    elif isinstance(value, list) or isinstance(value, tuple):
+        length = len(value)
+    elif type(value) is np.ndarray:
+        value = value.reshape(-1)
+        length = value.shape[0]
+    else:
+        label = f"{label} \n"
+        return label
+    if length == 0:
+        label = f"{label} \n"
+        return label
+    for i in range(length-1):
+        label = f"{label}{value[i]} "
+    label = f"{label}{value[-1]}\n"
+    return label
+
+
+def write_calib(index, camera_info):
+    calib_dir = os.path.join(split_dir, 'calib')
+    calib_filename = os.path.join(calib_dir, '%06d.txt' % (index))
+    with open(calib_filename, 'w') as f:
+        f.write(linestr('image_height', camera_info.height))
+        f.write(linestr('image_width', camera_info.width))
+        camera_info_P = np.array(camera_info.P).reshape([3, 4])
+        camera_info_P[0, 3] = 0
+        camera_info_P[1, 3] = 0
+        f.write(linestr('P', camera_info_P))  # 3x4
+        # 激光雷达和相机的外参
+        crpy = rospy.get_param(f"cameraTF/rpy_radian")
+        ctrans = rospy.get_param(f"cameraTF/translation")
+        cT = gp.transform_from_rot_trans(gp.euler_to_Rmatrix(
+            crpy[2], crpy[1], crpy[0]), np.array(ctrans))
+        f.write(linestr('Tr_cam_to_base', cT[0:3, :]))
+        vrpy = rospy.get_param(f"velodyneTF/rpy_radian")
+        vtrans = rospy.get_param(f"velodyneTF/translation")
+        vT = gp.transform_from_rot_trans(gp.euler_to_Rmatrix(
+            vrpy[2], vrpy[1], vrpy[0]), np.array(vtrans))
+        f.write(linestr('Tr_velo_to_base', vT[0:3, :]))
+
+
+def write_image(index, ros_image, camera_info, camera_number):
+    image_dir = os.path.join(split_dir, f'image_{camera_number}')
+    image_filename = os.path.join(image_dir, '%06d.png' % (index))
+    rgb_image = CvBridge().imgmsg_to_cv2(ros_image, desired_encoding="bgr8")
+    camera_info_K = np.array(camera_info.K).reshape([3, 3])
+    camera_info_D = np.array(camera_info.D)
+    camera_info_P = np.array(camera_info.P).reshape([3, 4])
+    camera_info_P[0, 3] = 0  # 不影响畸变矫正结果
+    camera_info_P[1, 3] = 0
+    rgb_undist = cv2.undistort(
+        rgb_image, camera_info_K, camera_info_D, None, camera_info_P)
+    cv2.imwrite(image_filename, rgb_undist)
+
+
+def write_velodyne(index, ros_velodyne):
+    velodyne_dir = os.path.join(split_dir, 'velodyne')
+    velodyne_filename = os.path.join(velodyne_dir, '%06d.bin' % (index))
+    vely_pc = list(point_cloud2.read_points(
+        ros_velodyne, field_names=("x", "y", "z"), skip_nans=True))
+    vely_pc = np.array(vely_pc)
+    # vely_pc = vely_pc[:, :3]
+    vely_pc.tofile(velodyne_filename)
+
+
+def write_raw_label(index, object_list):
+    raw_label_dir = os.path.join(split_dir, 'label_2_raw')
+    raw_label_filename = os.path.join(raw_label_dir, '%06d.txt' % (index))
+    with open(raw_label_filename, 'w') as f:
+        for object in object_list:
+            f.write(object.get_labelline())
+
+
+def write_basic_infos(index, mystate, ros_timestamp, camera_timestamp):
+    info_dir = os.path.join(split_dir, 'info')
+    info_filename = os.path.join(info_dir, '%06d.txt' % (index))
+    with open(info_filename, 'w') as f:
+        f.write(linestr('x', mystate.modelstate.pose.position.x))
+        f.write(linestr('y', mystate.modelstate.pose.position.y))
+        f.write(linestr('ros_timestamp', ros_timestamp))
+        f.write(linestr('camera_timestamp', camera_timestamp))
+
+
 # def callback(imageL, imageR, pc2_data):
-#     global shotting
-#     if shotting is False:
-#         return
-
-#     vely_pc = point_cloud2.read_points(pc2_data, field_names=("x", "y", "z"), skip_nans=True)
-
-#     print type(gen)
-#     # for p in gen:
-#     #   print " x : %.3f  y: %.3f  z: %.3f" % (p[0], p[1], p[2])
-#     time.sleep(1)
+index = 0
 
 
 def callback(rgb_msg, camera_info):
     rospy.loginfo("camera collecting time: %s", rgb_msg.header.stamp.to_sec())
+    ros_time = rospy.get_time()
+    # 可能会有滞后，测试过后解决
+    mystate = get_mystate()
+    objectstate_list = get_objectstate(mystate)
+    rospy.loginfo("get state.")
+
     rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-    camera_info_K = np.array(camera_info.K).reshape([3, 3])
-    camera_info_D = np.array(camera_info.D)
-    rgb_undist = cv2.undistort(rgb_image, camera_info_K, camera_info_D)
+    cv2.imshow("w", rgb_image)
+    key = cv2.waitKey(50)
+    write = False
+    if key is 115:
+        write = True
 
-    # # info show
-    # print("camera params:")
-    # print(camera_info_K)
-    # print(camera_info_D)
-    cv2.imshow("image show", rgb_undist)
-    cv2.waitKey(1)
+    if write:
+        print("write once!")
+        global index
+        write_calib(index, camera_info)
+        write_image(index, rgb_msg, camera_info, 2)
 
-    label()
-    print("read")
+        write_raw_label(index, objectstate_list)
+        write_basic_infos(index, mystate, ros_time,
+                          rgb_msg.header.stamp.to_sec())
+        index += 1
+        # write_velodyne(index, velodyne_msg)
 
 
 def ros_init():

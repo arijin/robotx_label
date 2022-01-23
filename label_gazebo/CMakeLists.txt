@@ -36,8 +36,13 @@ catkin_package(
 
 # Python Scripts
 catkin_install_python(PROGRAMS
+  scripts/data.py
   scripts/label.py
   scripts/geopy.py
+  scripts/utils/downloads.py
+  scripts/utils/general.py
+  scripts/utils/metrics.py
+  scripts/utils/plots.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark other directories for installation:
