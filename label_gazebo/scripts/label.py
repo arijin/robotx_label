@@ -209,16 +209,24 @@ def write_calib(index, camera_info):
         camera_info_P[1, 3] = 0
         f.write(linestr('P', camera_info_P))  # 3x4
         # 激光雷达和相机的外参
+        # 相机
         crpy = rospy.get_param(f"cameraTF/rpy_radian")
         ctrans = rospy.get_param(f"cameraTF/translation")
         cT = gp.transform_from_rot_trans(gp.euler_to_Rmatrix(
             crpy[2], crpy[1], crpy[0]), np.array(ctrans))
         f.write(linestr('Tr_cam_to_base', cT[0:3, :]))
+        # Velodyne
         vrpy = rospy.get_param(f"velodyneTF/rpy_radian")
         vtrans = rospy.get_param(f"velodyneTF/translation")
         vT = gp.transform_from_rot_trans(gp.euler_to_Rmatrix(
             vrpy[2], vrpy[1], vrpy[0]), np.array(vtrans))
         f.write(linestr('Tr_velo_to_base', vT[0:3, :]))
+        # Livox
+        lrpy = rospy.get_param(f"livoxTF/rpy_radian")
+        ltrans = rospy.get_param(f"livoxTF/translation")
+        lT = gp.transform_from_rot_trans(gp.euler_to_Rmatrix(
+            lrpy[2], lrpy[1], lrpy[0]), np.array(ltrans))
+        f.write(linestr('Tr_livox_to_base', lT[0:3, :]))
 
 
 def write_image(index, ros_image, camera_info, camera_number):
