@@ -21,7 +21,7 @@ from geometry_msgs.msg import Point
 from water_msgs.msg import ShipState
 # sensor data message
 from sensor_msgs.msg import Image, CameraInfo
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, PointCloud
 from sensor_msgs import point_cloud2
 
 
@@ -176,10 +176,6 @@ def get_objectstate(my_ship_state):
     # print(f"target number: {len(objectsList)}")
 
 
-def collect():
-    pass
-
-
 def linestr(key, value):
     label = f"{key}:"
     if isinstance(value, int) or isinstance(value, float) or isinstance(value, str):
@@ -245,8 +241,20 @@ def write_velodyne(index, ros_velodyne):
     vely_pc = list(point_cloud2.read_points(
         ros_velodyne, field_names=("x", "y", "z"), skip_nans=True))
     vely_pc = np.array(vely_pc)
+    print(velodyne_filename, ", velodyne pointcloud size: ", vely_pc.shape)
     # vely_pc = vely_pc[:, :3]
-    vely_pc.tofile(velodyne_filename)
+    vely_pc.tofile(velodyne_filename)  # 保存成bin文件时注意数据格式
+
+
+def write_livox(index, ros_livox):
+    livox_dir = os.path.join(split_dir, 'livox')
+    livox_filename = os.path.join(livox_dir, '%06d.bin' % (index))
+    pointcloud = list()
+    for point in ros_livox.points:
+        pointcloud.append([point.x, point.y, point.z])
+    livox_pc = np.array(pointcloud)
+    print("livox pointcloud size: ", livox_pc.shape)
+    livox_pc.tofile(livox_filename)
 
 
 def write_raw_label(index, object_list):
@@ -267,36 +275,105 @@ def write_basic_infos(index, mystate, ros_timestamp, camera_timestamp):
         f.write(linestr('camera_timestamp', camera_timestamp))
 
 
-# def callback(imageL, imageR, pc2_data):
+rgb_ram = None
+camera_info_ram = None
+velodyne_ram = None
+livox_ram = None
+
+need_velo = False
+need_livox = False
+write = False
+
 index = 0
 
 
-def callback(rgb_msg, camera_info):
-    rospy.loginfo("camera collecting time: %s", rgb_msg.header.stamp.to_sec())
+def collect(rgb_msg, camera_info, velo_msg, livox_msg):
+    rospy.loginfo("writing===camera time: %s, velo time: %s, livox time: %s.", rgb_msg.header.stamp.to_sec(
+    ), velo_msg.header.stamp.to_sec(), livox_msg.header.stamp.to_sec())
     ros_time = rospy.get_time()
-    # 可能会有滞后，测试过后解决
     mystate = get_mystate()
     objectstate_list = get_objectstate(mystate)
-    rospy.loginfo("get state.")
+    global index
+    write_calib(index, camera_info)
+    write_image(index, rgb_msg, camera_info, 2)
+    write_velodyne(index, velo_msg)
+    write_livox(index, livox_msg)
+    write_raw_label(index, objectstate_list)
+    write_basic_infos(index, mystate, ros_time,
+                      rgb_msg.header.stamp.to_sec())
+    index += 1
+    print("write once!")
 
-    rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-    cv2.imshow("w", rgb_image)
-    key = cv2.waitKey(50)
-    write = False
-    if key is 115:
-        write = True
 
-    if write:
-        print("write once!")
-        global index
-        write_calib(index, camera_info)
-        write_image(index, rgb_msg, camera_info, 2)
+def callback(rgb_msg, camera_info):
+    # rospy.loginfo("camera collecting time: %s", rgb_msg.header.stamp.to_sec())
+    # ros_time = rospy.get_time()
+    # print(f"real time: {time.time()}",
+    #       f"sim time: {rgb_msg.header.stamp.to_sec()}", ", camera come.")
+    global rgb_ram
+    global camera_info_ram
+    global velodyne_ram
+    global livox_ram
 
-        write_raw_label(index, objectstate_list)
-        write_basic_infos(index, mystate, ros_time,
-                          rgb_msg.header.stamp.to_sec())
-        index += 1
-        # write_velodyne(index, velodyne_msg)
+    global need_velo
+    global need_livox
+    global write
+
+    if write == True and need_velo == False and need_livox == False:
+        rgb_last_time = rgb_ram.header.stamp.to_sec()
+        rgb_current_time = rgb_msg.header.stamp.to_sec()
+        velo_time = velodyne_ram.header.stamp.to_sec()
+        livox_time = livox_ram.header.stamp.to_sec()
+        print(
+            f"c_ltime:{rgb_last_time}, c_ctime:{rgb_current_time}, vtime:{velo_time}, ltime:{livox_time}")
+        min_time = min(velo_time, livox_time)
+        max_time = max(velo_time, livox_time)
+        durrent_time = max_time - min_time
+        if durrent_time < 0.05:
+            print("writing once.")
+            collect(rgb_msg, camera_info, velodyne_ram, livox_ram)
+            write = False
+        else:
+            print("waiting...")
+            if velo_time < livox_time:
+                need_velo = True
+            else:
+                need_livox = True
+    if write == False:
+        rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
+        cv2.imshow("w", rgb_image)
+        key = cv2.waitKey(50)
+        if key == 115:
+            write = True
+
+    if write == True and need_velo == False and need_livox == False:
+        print("ready.")
+        need_velo = True
+        need_livox = True
+    rgb_ram = rgb_msg
+    camera_info_ram = camera_info
+
+
+def velodyne_callback(velodyne_msg):
+    # ros_time = rospy.get_time()
+    # print(f"real time: {time.time()}",
+    #       f"sim time: {velodyne_msg.header.stamp.to_sec()}", ", velodyne come.")
+    global velodyne_ram
+    global need_velo
+    if need_velo == True:
+        velodyne_ram = velodyne_msg
+        need_velo = False
+
+
+def livox_callback(livox_msg):
+    # ros_time = rospy.get_time()
+    # print(f"real time: {time.time()}",
+    #       f"sim time: {livox_msg.header.stamp.to_sec()}", ", livox come.")
+    global livox_ram
+    global need_livox
+    if need_livox == True:
+        livox_ram = livox_msg
+        need_livox = False
 
 
 def ros_init():
@@ -314,13 +391,14 @@ def ros_init():
     # info_R_sub = message_filters.Subscriber(
     #     '/wamv/sensors/cameras/front_right_camera/camera_info', CameraInfo)
 
-    # veledyne_sub = message_filters.Subscriber(
-    #     '/my_camera/depth/points', PointCloud2, callback_pointcloud)
-    # livox_sub = message_filters.Subscriber(
-    #     '/scan', PointCloud2, callback_pointcloud)
+    rospy.Subscriber('/wamv/sensors/lidars/lidar_wamv/points',
+                     PointCloud2, velodyne_callback, queue_size=5)
+    rospy.Subscriber('/scan',
+                     PointCloud, livox_callback, queue_size=5)
 
     # publish which sensors
-    ts = message_filters.TimeSynchronizer([image_L_sub, info_L_sub], 10)
+    ts = message_filters.TimeSynchronizer(
+        [image_L_sub, info_L_sub], 1)
     ts.registerCallback(callback)
 
 

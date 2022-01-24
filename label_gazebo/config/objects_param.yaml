@@ -98,11 +98,11 @@ objects:
       [[0, 0], [-20, 0], [-40, 0], [0, -20], [-20, -20], [-40, -20]]
   light_buoy:
     global_position: [-511, 218]
-    global_yaw: 0
+    global_yaw: 3.14
     size: [0.45, -0.45, 0.45, -0.45, 1.75]
     relative_position: [[0, 0]]
   docking:
     global_position: [-554, 233]
-    global_yaw: 0
+    global_yaw: 3.14
     size: [7, -1, 19, -1, 0.23]
     relative_position: [[0, 0]]
