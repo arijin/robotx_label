@@ -313,11 +313,16 @@ def collect(rgb_msg, camera_info, velo_msg, livox_msg):
     print("write once!")
 
 
+last_collect_time = 0
+
+
 def callback(rgb_msg, camera_info):
     # rospy.loginfo("camera collecting time: %s", rgb_msg.header.stamp.to_sec())
-    # ros_time = rospy.get_time()
+    ros_time = rospy.get_time()
     # print(f"real time: {time.time()}",
     #       f"sim time: {rgb_msg.header.stamp.to_sec()}", ", camera come.")
+    global last_collect_time
+
     global rgb_ram
     global camera_info_ram
     global velodyne_ram
@@ -347,13 +352,18 @@ def callback(rgb_msg, camera_info):
                 need_velo = True
             else:
                 need_livox = True
-    if write == False:
-        rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-        cv2.imshow("w", rgb_image)
-        key = cv2.waitKey(50)
-        if key == 115:
-            write = True
-
+    # ======== shoting采集模式 ============
+    # if write == False:
+    #     rgb_image = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
+    #     cv2.imshow("w", rgb_image)
+    #     key = cv2.waitKey(50)
+    #     if key == 115:
+    #         write = True
+    # ========== 连续采集模式 =============
+    if write == False and ros_time - last_collect_time > 0.5:
+        write = True
+        last_collect_time = ros_time
+    # ===================================
     if write == True and need_velo == False and need_livox == False:
         print("ready.")
         need_velo = True
@@ -408,6 +418,8 @@ def ros_init():
     ts = message_filters.TimeSynchronizer(
         [image_L_sub, info_L_sub], 1)
     ts.registerCallback(callback)
+    global last_collect_time
+    last_collect_time = rospy.get_time()
 
 
 if __name__ == '__main__':
